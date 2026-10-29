@@ -1,5 +1,8 @@
 # Dependencies
 node_modules/
+jspm_packages/
+bower_components/
+.pnpm-store/
 
 # Environment variables and credentials
 .env
@@ -12,11 +15,82 @@ screenshots/
 videos/
 test-results/
 playwright-report/
+coverage/
+.nyc_output/
+*.lcov
 
-# Logs
-*.log
+# Self-healing logs and cache
 healing-logs/
+resources/healing-cache.json
+*.log
+
+# Node.js logs and diagnostic reports
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# TypeScript
+*.tsbuildinfo
+
+# Package manager and build artifacts
+.npm/
+*.tgz
+.yarn-integrity
+.lock-wscript
+lib-cov/
+build/Release/
+
+# Tool caches
+.grunt/
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+.node_repl_history
+.fusebox/
+.tern-port
+.vscode-test/
+.vite/
+**/.vitepress/dist/
+**/.vitepress/cache/
+.astro/
+.turbo/
+.firebase/
+.dynamodb/
+.serverless/
+
+# Framework build output
+.next/
+out/
+.nuxt/
+dist/
+.output/
+.vuepress/dist/
+.temp/
+.svelte-kit/
+.docusaurus/
+web_modules/
+.pnp.*
+.yarn/*
+
+# Keep Yarn configuration files if needed
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
 
 # Operating system files
 .DS_Store
 Thumbs.db
+
+# Editor settings
+.vscode/

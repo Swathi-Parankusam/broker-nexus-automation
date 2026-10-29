@@ -1,0 +1,6 @@
+{
+  "loginButton": {
+    "type": "css",
+    "value": "button.bg-\\[\\#3949AB\\]"
+  }
+}

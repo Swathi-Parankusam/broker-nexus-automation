@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Environment variables and credentials
+.env
+.env.*
+!.env.example
+
+# Test reports and generated artifacts
+reports/
+screenshots/
+videos/
+test-results/
+playwright-report/
+
+# Logs
+*.log
+healing-logs/
+
+# Operating system files
+.DS_Store
+Thumbs.db

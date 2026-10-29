@@ -1,0 +1,15 @@
+{
+  "emailInput": {
+    "type": "css",
+    "value": "#email"
+  },
+  "passwordInput": {
+    "type": "css",
+    "value": "#password"
+  },
+  "loginButton": {
+    "type": "role",
+    "role": "button",
+    "name": "Login"
+  }
+}

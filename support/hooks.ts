@@ -9,6 +9,8 @@ import {
 
 import {
   chromium,
+  firefox,
+  webkit,
   type Browser,
   type BrowserContext,
   type Page,
@@ -22,15 +24,7 @@ import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
 
-// =====================================================
-// DEFAULT TIMEOUT
-// =====================================================
-
 setDefaultTimeout(60000);
-
-// =====================================================
-// DIRECTORIES
-// =====================================================
 
 const screenshotDirectory = path.resolve('screenshots');
 const videoDirectory = path.resolve('videos');
@@ -40,33 +34,15 @@ fs.mkdirSync(screenshotDirectory, { recursive: true });
 fs.mkdirSync(videoDirectory, { recursive: true });
 fs.mkdirSync(reportDirectory, { recursive: true });
 
-// =====================================================
-// BROWSER CONFIGURATION
-// =====================================================
-
 let browser: Browser;
-
-// =====================================================
-// HELPER: CREATE SAFE FILE NAME
-// =====================================================
 
 function createSafeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9-_]/g, '_');
 }
 
-// =====================================================
-// HELPER: CREATE TIMESTAMP
-// =====================================================
-
 function createTimestamp(): string {
-  return new Date()
-    .toISOString()
-    .replace(/[:.]/g, '-');
+  return new Date().toISOString().replace(/[:.]/g, '-');
 }
-
-// =====================================================
-// HELPER: CAPTURE AND ATTACH SCREENSHOT
-// =====================================================
 
 async function captureAndAttachScreenshot(
   world: CustomWorld,
@@ -96,78 +72,46 @@ async function captureAndAttachScreenshot(
     world.attach(screenshotBuffer, 'image/png');
 
     console.log(`Screenshot saved: ${screenshotPath}`);
-    console.log(`Screenshot attached: ${scenarioName}`);
   } catch (error) {
-    console.error(
-      `Unable to capture screenshot for ${scenarioName}:`,
-      error
-    );
+    console.error(`Screenshot capture failed:`, error);
   }
 }
-
-// =====================================================
-// HELPER: CLOSE BROWSER CONTEXT
-// =====================================================
 
 async function closeBrowserContext(
   context: BrowserContext | undefined,
   scenarioName: string
 ): Promise<void> {
-  if (!context) {
-    return;
-  }
+  if (!context) return;
 
   try {
     await context.close();
     console.log(`Browser context closed: ${scenarioName}`);
   } catch (error) {
-    console.error(
-      `Unable to close browser context for ${scenarioName}:`,
-      error
-    );
+    console.error(`Context close failed:`, error);
   }
 }
-
-// =====================================================
-// HELPER: ATTACH VIDEO
-// =====================================================
 
 async function attachVideo(
   world: CustomWorld,
   video: Video | null,
   scenarioName: string
 ): Promise<void> {
-  if (!video) {
-    console.warn(`No video available: ${scenarioName}`);
-    return;
-  }
+  if (!video) return;
 
   try {
-    // The video path becomes available after its context closes.
     const videoPath = await video.path();
 
-    if (!fs.existsSync(videoPath)) {
-      console.warn(`Video file not found: ${videoPath}`);
-      return;
-    }
+    if (!fs.existsSync(videoPath)) return;
 
     const videoBuffer = fs.readFileSync(videoPath);
 
     world.attach(videoBuffer, 'video/webm');
 
-    console.log(`Video saved: ${videoPath}`);
     console.log(`Video attached: ${scenarioName}`);
   } catch (error) {
-    console.error(
-      `Unable to attach video for ${scenarioName}:`,
-      error
-    );
+    console.error(`Video attachment failed:`, error);
   }
 }
-
-// =====================================================
-// HELPER: LOG SCENARIO RESULT
-// =====================================================
 
 function logScenarioResult(
   status: string | undefined,
@@ -175,40 +119,41 @@ function logScenarioResult(
 ): void {
   if (status === Status.PASSED) {
     console.log(`Scenario PASSED: ${scenarioName}`);
-    return;
-  }
-
-  if (status === Status.FAILED) {
+  } else if (status === Status.FAILED) {
     console.log(`Scenario FAILED: ${scenarioName}`);
-    return;
+  } else {
+    console.log(`Scenario status: ${status ?? 'UNKNOWN'} - ${scenarioName}`);
   }
-
-  console.log(
-    `Scenario status: ${status ?? 'UNKNOWN'} - ${scenarioName}`
-  );
 }
 
-// =====================================================
-// BEFORE ALL SCENARIOS
-// Launch the browser once.
-// =====================================================
-
 BeforeAll(async function () {
-  browser = await chromium.launch({
-    headless: false,
-    slowMo: 3000,
-  });
+  const browserName = process.env.BROWSER || 'chromium';
 
-  console.log('Chromium browser launched successfully.');
+  const launchOptions = {
+    headless: false,
+    slowMo: process.env.DEMO_MODE === 'true' ? 1000 : 0,
+  };
+
+  switch (browserName.toLowerCase()) {
+    case 'firefox':
+      browser = await firefox.launch(launchOptions);
+      break;
+
+    case 'webkit':
+      browser = await webkit.launch(launchOptions);
+      break;
+
+    case 'chromium':
+    default:
+      browser = await chromium.launch(launchOptions);
+      break;
+  }
+
+  console.log(`${browserName} browser launched successfully.`);
 });
 
-// =====================================================
-// BEFORE EACH SCENARIO
-// Create a new context and page with video recording.
-// =====================================================
-
 Before(async function (this: CustomWorld) {
-  const context: BrowserContext = await browser.newContext({
+  const context = await browser.newContext({
     viewport: {
       width: 1366,
       height: 768,
@@ -222,7 +167,7 @@ Before(async function (this: CustomWorld) {
     },
   });
 
-  const page: Page = await context.newPage();
+  const page = await context.newPage();
 
   page.setDefaultTimeout(15000);
 
@@ -230,13 +175,8 @@ Before(async function (this: CustomWorld) {
   this.context = context;
   this.page = page;
 
-  console.log('New browser context and page created.');
+  console.log('New POSO browser context and page created.');
 });
-
-// =====================================================
-// AFTER EACH SCENARIO
-// Capture screenshot, finalize video, and attach evidence.
-// =====================================================
 
 After(async function (this: CustomWorld, scenario) {
   const page = this.page;
@@ -244,10 +184,8 @@ After(async function (this: CustomWorld, scenario) {
   const scenarioName = scenario.pickle.name;
   const timestamp = createTimestamp();
 
-  // Obtain the video object before closing the context.
   const video: Video | null = page ? page.video() : null;
 
-  // Capture and attach a screenshot for passed and failed scenarios.
   await captureAndAttachScreenshot(
     this,
     page,
@@ -255,34 +193,19 @@ After(async function (this: CustomWorld, scenario) {
     timestamp
   );
 
-  // Close the context so Playwright finalizes the recording.
   await closeBrowserContext(context, scenarioName);
 
-  // Attach the finalized video to the Cucumber scenario.
-  await attachVideo(
-    this,
-    video,
-    scenarioName
-  );
+  await attachVideo(this, video, scenarioName);
 
-  // Log the final scenario result.
   logScenarioResult(
     scenario.result?.status,
     scenarioName
   );
 });
 
-// =====================================================
-// AFTER ALL SCENARIOS
-// Close the browser after execution.
-// =====================================================
-
 AfterAll(async function () {
-  if (!browser) {
-    return;
+  if (browser) {
+    await browser.close();
+    console.log('POSO browser closed.');
   }
-
-  await browser.close();
-
-  console.log('Chromium browser closed.');
 });

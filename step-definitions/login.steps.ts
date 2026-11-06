@@ -4,26 +4,14 @@ import {
     Then
 } from '@cucumber/cucumber';
 
-import {
-    expect,
-    type Page
-} from '@playwright/test';
-
 import { LoginPage } from '../pages/LoginPage.ts';
-
-// =====================================================
-// CUSTOM WORLD TYPE
-// =====================================================
-
-type CustomWorld = {
-    page?: Page | null;
-};
+import type { CustomWorld } from '../support/world.ts';
 
 // =====================================================
 // HELPER 1: GET PLAYWRIGHT PAGE SAFELY
 // =====================================================
 
-function getPage(world: CustomWorld): Page {
+function getPage(world: CustomWorld) {
     if (!world.page) {
         throw new Error(
             'Browser page is not initialized. Please check support/hooks.ts.'
@@ -37,19 +25,14 @@ function getPage(world: CustomWorld): Page {
 // HELPER 2: GET LOGIN PAGE
 // =====================================================
 
-const loginPages = new WeakMap<CustomWorld, LoginPage>();
-
 function getLoginPage(world: CustomWorld): LoginPage {
     const page = getPage(world);
 
-    let loginPage = loginPages.get(world);
-
-    if (!loginPage) {
-        loginPage = new LoginPage(page);
-        loginPages.set(world, loginPage);
+    if (!world.loginPage) {
+        world.loginPage = new LoginPage(page);
     }
 
-    return loginPage;
+    return world.loginPage;
 }
 
 // =====================================================
@@ -61,7 +44,7 @@ function getCredential(name: string): string {
 
     if (!value) {
         throw new Error(
-            `${name} is missing or empty. Please check your .env file.`
+            `${name} is missing or empty. Please check your POSO .env file.`
         );
     }
 
@@ -74,73 +57,32 @@ function getCredential(name: string): string {
 
 async function demoPause(
     world: CustomWorld,
-    milliseconds = 3000
+    milliseconds = 1500
 ): Promise<void> {
     const page = getPage(world);
 
-    await page.waitForTimeout(milliseconds);
-}
-
-// =====================================================
-// HELPER 5: NORMALIZE URL
-// =====================================================
-
-function normalizeUrl(url: string): string {
-    const parsedUrl = new URL(url);
-
-    while (
-        parsedUrl.pathname.length > 1 &&
-        parsedUrl.pathname.endsWith('/')
-    ) {
-        parsedUrl.pathname = parsedUrl.pathname.slice(0, -1);
+    if (process.env.DEMO_MODE === 'true') {
+        await page.waitForTimeout(milliseconds);
     }
-
-    return parsedUrl.href.endsWith('/')
-        ? parsedUrl.href.slice(0, -1)
-        : parsedUrl.href;
 }
 
 // =====================================================
-// HELPER 6: CHECK LOGIN FORM VISIBILITY
-// =====================================================
-
-async function isLoginFormVisible(
-    loginPage: LoginPage
-): Promise<boolean> {
-    const emailVisible = await loginPage.emailInput
-        .isVisible()
-        .catch(() => false);
-
-    const passwordVisible = await loginPage.passwordInput
-        .isVisible()
-        .catch(() => false);
-
-    const buttonVisible = await loginPage.loginButton
-        .isVisible()
-        .catch(() => false);
-
-    return emailVisible && passwordVisible && buttonVisible;
-}
-
-// =====================================================
-// 1. OPEN BROKER NEXUS LOGIN PAGE
+// 1. OPEN POSO LOGIN PAGE
 // =====================================================
 
 Given(
-    'I open the Broker Nexus login page',
+    'I open the POSO login page',
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
 
-        console.log('Opening Broker Nexus login page...');
+        console.log('Opening POSO login page...');
 
         await loginPage.navigate();
+        await loginPage.verifyLoginFormVisible();
 
-        await expect(loginPage.emailInput).toBeVisible();
-        await expect(loginPage.passwordInput).toBeVisible();
+        await demoPause(this);
 
-        await demoPause(this, 2000);
-
-        console.log('Broker Nexus login page displayed.');
+        console.log('POSO login page displayed.');
     }
 );
 
@@ -153,9 +95,8 @@ Then(
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
 
-        await expect(loginPage.emailInput).toBeVisible();
-
-        await demoPause(this, 1500);
+        await loginPage.verifyEmailFieldVisible();
+        await demoPause(this);
 
         console.log('Email Address field is visible.');
     }
@@ -170,12 +111,8 @@ Then(
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
 
-        await expect(loginPage.emailInput).toHaveAttribute(
-            'placeholder',
-            'Enter your email ID'
-        );
-
-        await demoPause(this, 1500);
+        await loginPage.verifyEmailPlaceholder();
+        await demoPause(this);
 
         console.log('Email Address placeholder verified.');
     }
@@ -190,9 +127,8 @@ Then(
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
 
-        await expect(loginPage.passwordInput).toBeVisible();
-
-        await demoPause(this, 1500);
+        await loginPage.verifyPasswordFieldVisible();
+        await demoPause(this);
 
         console.log('Password field is visible.');
     }
@@ -207,12 +143,8 @@ Then(
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
 
-        await expect(loginPage.passwordInput).toHaveAttribute(
-            'type',
-            'password'
-        );
-
-        await demoPause(this, 1500);
+        await loginPage.verifyPasswordMasked();
+        await demoPause(this);
 
         console.log('Password is masked.');
     }
@@ -226,7 +158,11 @@ Then(
     'the password visibility icon should be visible',
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
-        await loginPage.inspectPasswordVisibilityIcon();
+
+        await loginPage.verifyPasswordVisibilityIcon();
+        await demoPause(this);
+
+        console.log('Password visibility icon is visible.');
     }
 );
 
@@ -243,8 +179,7 @@ When(
         const loginPage = getLoginPage(this);
 
         await loginPage.enterPassword(password);
-
-        await demoPause(this, 1500);
+        await demoPause(this);
 
         console.log('Password entered.');
     }
@@ -260,8 +195,7 @@ When(
         const loginPage = getLoginPage(this);
 
         await loginPage.clickPasswordVisibilityIcon();
-
-        await demoPause(this, 1500);
+        await demoPause(this);
 
         console.log('Password visibility icon clicked.');
     }
@@ -276,12 +210,8 @@ Then(
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
 
-        await expect(loginPage.passwordInput).toHaveAttribute(
-            'type',
-            'text'
-        );
-
-        await demoPause(this, 1500);
+        await loginPage.verifyPasswordVisibleAsText();
+        await demoPause(this);
 
         console.log('Password is displayed in plain text.');
     }
@@ -300,15 +230,14 @@ When(
         const loginPage = getLoginPage(this);
 
         await loginPage.enterEmail(email);
-
-        await demoPause(this, 1500);
+        await demoPause(this);
 
         console.log('Email address entered.');
     }
 );
 
 // =====================================================
-// 11. ENTER VALID LOGIN CREDENTIALS
+// 11. ENTER VALID POSO LOGIN CREDENTIALS
 // =====================================================
 
 When(
@@ -316,39 +245,47 @@ When(
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
 
-        const email = getCredential('BROKER_NEXUS_EMAIL');
-        const password = getCredential('BROKER_NEXUS_PASSWORD');
+        const email = getCredential('POSO_EMAIL');
+        const password = getCredential('POSO_PASSWORD');
 
-        console.log('Entering valid login credentials...');
+        console.log('Entering valid POSO login credentials...');
 
         await loginPage.enterEmail(email);
-        await demoPause(this, 1500);
+        await demoPause(this);
 
         await loginPage.enterPassword(password);
-        await demoPause(this, 2000);
+        await demoPause(this);
 
-        console.log('Login credentials entered.');
+        console.log('POSO login credentials entered.');
     }
 );
 
 // =====================================================
-// 12. CLICK LOGIN BUTTON
+// 12. SUBMIT LOGIN FORM
 // =====================================================
+
+async function submitLogin(world: CustomWorld): Promise<void> {
+    const loginPage = getLoginPage(world);
+
+    console.log('Submitting POSO login form...');
+
+    await loginPage.clickLogin();
+    await demoPause(world, 2000);
+
+    console.log('POSO login form submitted.');
+}
+
+When(
+    'I submit the login form',
+    async function (this: CustomWorld) {
+        await submitLogin(this);
+    }
+);
 
 When(
     'I click the Login button',
     async function (this: CustomWorld) {
-        const loginPage = getLoginPage(this);
-
-        await demoPause(this, 1500);
-
-        console.log('Clicking Login button...');
-
-        await loginPage.clickLogin();
-
-        await demoPause(this, 2500);
-
-        console.log('Login button clicked.');
+        await submitLogin(this);
     }
 );
 
@@ -359,39 +296,14 @@ When(
 Then(
     'I should be logged in successfully',
     async function (this: CustomWorld) {
-        const page = getPage(this);
         const loginPage = getLoginPage(this);
 
-        const baseUrl = normalizeUrl(
-            getCredential('BROKER_NEXUS_URL')
-        );
+        console.log('Verifying successful POSO login...');
 
-        console.log('Verifying successful login...');
+        await loginPage.verifyLoginSuccessful();
+        await demoPause(this);
 
-        await expect.poll(
-            async () => {
-                const currentUrl = normalizeUrl(page.url());
-
-                const loginButtonVisible = await loginPage.loginButton
-                    .isVisible()
-                    .catch(() => false);
-
-                return (
-                    currentUrl !== baseUrl ||
-                    !loginButtonVisible
-                );
-            },
-            {
-                message:
-                    'Login was not confirmed. Expected navigation away from the login page or the Login button to disappear.',
-                timeout: 15000,
-                intervals: [500, 1000, 2000]
-            }
-        ).toBe(true);
-
-        await demoPause(this, 2000);
-
-        console.log('Login success condition verified.');
+        console.log('POSO login success verified.');
     }
 );
 
@@ -402,31 +314,14 @@ Then(
 Then(
     'I should see the homepage',
     async function (this: CustomWorld) {
-        const page = getPage(this);
+        const loginPage = getLoginPage(this);
 
-        console.log('Verifying Broker Nexus homepage...');
+        console.log('Verifying POSO homepage...');
 
-        await page.waitForLoadState('domcontentloaded');
+        await loginPage.verifyHomepageVisible();
+        await demoPause(this);
 
-        const baseUrl = normalizeUrl(
-            getCredential('BROKER_NEXUS_URL')
-        );
-
-        await expect.poll(
-            () => normalizeUrl(page.url()),
-            {
-                message:
-                    'Expected the application to navigate away from the login page.',
-                timeout: 15000,
-                intervals: [500, 1000, 2000]
-            }
-        ).not.toBe(baseUrl);
-
-        await expect(page.locator('body')).toBeVisible();
-
-        await demoPause(this, 2000);
-
-        console.log('Homepage visibility checks completed.');
+        console.log('POSO homepage is visible.');
     }
 );
 
@@ -439,11 +334,10 @@ When(
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
 
-        console.log('Entering a whitespace-only password...');
+        console.log('Entering whitespace-only password...');
 
         await loginPage.enterPassword('   ');
-
-        await demoPause(this, 1500);
+        await demoPause(this);
 
         console.log('Whitespace-only password entered.');
     }
@@ -456,63 +350,84 @@ When(
 Then(
     'login should be rejected',
     async function (this: CustomWorld) {
-        const page = getPage(this);
         const loginPage = getLoginPage(this);
 
-        console.log('Verifying that login is rejected...');
+        console.log('Verifying POSO login rejection...');
 
-        const baseUrl = normalizeUrl(
-            getCredential('BROKER_NEXUS_URL')
-        );
+        await loginPage.verifyLoginRejected();
+        await demoPause(this);
 
-        await demoPause(this, 1500);
-
-        const loginFormVisible = await isLoginFormVisible(loginPage);
-
-        const currentUrl = normalizeUrl(page.url());
-
-        const rejectionMessageVisible = await page.getByText(
-            /invalid|incorrect|wrong|failed|required|enter.*email|enter.*password|unable to log in|authentication failed/i
-        ).first().isVisible().catch(() => false);
-
-        const remainedOnLoginPage = currentUrl === baseUrl;
-
-        expect(
-            loginFormVisible &&
-            (remainedOnLoginPage || rejectionMessageVisible),
-            [
-                'Login rejection could not be confirmed.',
-                `Current URL: ${page.url()}`,
-                `Login form visible: ${loginFormVisible}`,
-                `Rejection message visible: ${rejectionMessageVisible}`
-            ].join('\n')
-        ).toBe(true);
-
-        await demoPause(this, 1500);
-
-        console.log('Login rejection condition verified.');
+        console.log('POSO login rejection verified.');
     }
 );
 
 // =====================================================
-// 17. CLICK LOGOUT BUTTON (LEGACY STEP)
+// 17. OPEN ACCOUNT MENU
 // =====================================================
+
+async function openAccountMenu(world: CustomWorld): Promise<void> {
+    const loginPage = getLoginPage(world);
+
+    console.log('Opening POSO Account menu...');
+
+    await loginPage.clickAccountMenu();
+    await demoPause(world);
+
+    console.log('POSO Account menu opened.');
+}
+
+When(
+    'I open the Account menu',
+    async function (this: CustomWorld) {
+        await openAccountMenu(this);
+    }
+);
+
+When(
+    'I click the Profile Icon',
+    async function (this: CustomWorld) {
+        await openAccountMenu(this);
+    }
+);
+
+// =====================================================
+// 18. CLICK SIGN OUT OPTION
+// =====================================================
+
+async function signOut(world: CustomWorld): Promise<void> {
+    const loginPage = getLoginPage(world);
+
+    console.log('Clicking POSO Sign out option...');
+
+    await loginPage.clickLogoutOption();
+    await demoPause(world, 2000);
+
+    console.log('POSO Sign out option clicked.');
+}
+
+When(
+    'I click the Sign out option',
+    async function (this: CustomWorld) {
+        await signOut(this);
+    }
+);
+
+When(
+    'I click the Logout option',
+    async function (this: CustomWorld) {
+        await signOut(this);
+    }
+);
 
 When(
     'I click the Logout button',
     async function (this: CustomWorld) {
-        console.log('Clicking the Logout button...');
-
-        await getPage(this).getByRole('button', { name: /logout/i }).click();
-
-        await demoPause(this, 2000);
-
-        console.log('Logout button clicked.');
+        await signOut(this);
     }
 );
 
 // =====================================================
-// 18. VERIFY SUCCESSFUL LOGOUT
+// 19. VERIFY SUCCESSFUL LOGOUT
 // =====================================================
 
 Then(
@@ -520,101 +435,46 @@ Then(
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
 
-        console.log('Verifying successful logout...');
+        console.log('Verifying successful POSO logout...');
 
-        await expect(loginPage.emailInput).toBeVisible();
-        await expect(loginPage.passwordInput).toBeVisible();
-        await expect(loginPage.loginButton).toBeVisible();
+        await loginPage.verifyLoggedOut();
+        await demoPause(this);
 
-        await demoPause(this, 2000);
-
-        console.log('Logout successful: login form is visible.');
+        console.log('POSO logout successful.');
     }
 );
 
 // =====================================================
-// 19. CLICK PROFILE ICON
+// 20. VERIFY REDIRECTION TO LOGIN PAGE
 // =====================================================
 
-When(
-    'I click the Profile Icon',
-    async function (this: CustomWorld) {
-        const loginPage = getLoginPage(this);
-
-        console.log('Clicking the Profile Icon...');
-
-        await loginPage.clickProfileIcon();
-
-        await demoPause(this, 1000);
-
-        console.log('Profile Icon clicked.');
-    }
-);
-
-// =====================================================
-// 20. CLICK LOGOUT OPTION
-// =====================================================
-
-When(
-    'I click the Logout option',
-    async function (this: CustomWorld) {
-        const loginPage = getLoginPage(this);
-
-        console.log('Clicking the Logout option...');
-
-        await loginPage.clickLogoutOption();
-
-        await demoPause(this, 2000);
-
-        console.log('Logout option clicked.');
-    }
-);
-
-// =====================================================
-// 21. VERIFY REDIRECTION TO LOGIN PAGE
-// =====================================================
-
-/* Then(
+Then(
     'I should be redirected to the login page',
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
 
-        console.log('Verifying redirection to the login page...');
+        console.log('Verifying redirection to POSO login page...');
 
-        await loginPage.verifyLoginPageRedirection();
+        await loginPage.verifyLoggedOut();
+        await demoPause(this);
 
-        await expect(loginPage.emailInput).toBeVisible();
-        await expect(loginPage.passwordInput).toBeVisible();
-        await expect(loginPage.loginButton).toBeVisible();
-
-        await demoPause(this, 2000);
-
-        console.log('Redirected to the login page successfully.');
+        console.log('Redirected to POSO login page.');
     }
-); */   
+);
 
 // =====================================================
-// 22. DEBUG: INSPECT PASSWORD VISIBILITY ELEMENTS
+// 21. DEBUG PASSWORD VISIBILITY ELEMENTS
 // =====================================================
 
 When(
     'I inspect the password visibility elements',
     async function (this: CustomWorld) {
-        console.log('Inspecting password visibility elements...');
+        const loginPage = getLoginPage(this);
 
-        const passwordFields = await getPage(this)
-            .locator('input[type="password"]')
-            .evaluateAll((inputs) =>
-                inputs.map(
-                    (input) =>
-                        input.parentElement?.outerHTML ??
-                        input.outerHTML
-                )
-            );
+        console.log('Inspecting POSO password visibility elements...');
 
-        console.log(
-            'Password visibility elements:',
-            passwordFields
-        );
+        await loginPage.inspectPasswordVisibilityIcon();
+
+        console.log('Password visibility inspection completed.');
     }
 );

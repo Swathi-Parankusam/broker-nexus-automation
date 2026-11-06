@@ -2,5 +2,22 @@
   "loginButton": {
     "type": "css",
     "value": "button.bg-\\[\\#3949AB\\]"
+  },
+  "profileIcon": {
+    "type": "role",
+    "role": "button",
+    "name": "A"
+  },
+  "underwriters.underwritersPageHeading": {
+    "type": "text",
+    "value": "Underwriters"
+  },
+  "underwriters.field.premiumRateBases": {
+    "type": "label",
+    "value": "Premium Rate Bases"
+  },
+  "accountMenu": {
+    "type": "css",
+    "value": "[id=\"radix-:r5:\"]"
   }
 }

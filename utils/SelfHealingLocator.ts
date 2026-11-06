@@ -1,15 +1,8 @@
 import type { Locator, Page } from '@playwright/test';
+import type { LocatorConfig } from './LocatorConfig.js';
+
 import fs from 'node:fs';
 import path from 'node:path';
-
-export type LocatorConfig =
-    | { type: 'css'; value: string }
-    | { type: 'xpath'; value: string }
-    | { type: 'placeholder'; value: string }
-    | { type: 'label'; value: string }
-    | { type: 'text'; value: string }
-    | { type: 'testId'; value: string }
-    | { type: 'role'; role: 'button'; name: string };
 
 type HealingCache = Record<string, LocatorConfig>;
 
@@ -47,6 +40,7 @@ export class SelfHealingLocator {
         );
     }
 
+    // Read previously healed locators.
     private readCache(): HealingCache {
         if (!fs.existsSync(this.cachePath)) {
             return {};
@@ -80,6 +74,7 @@ export class SelfHealingLocator {
         }
     }
 
+    // Save a successfully healed locator.
     private saveCache(
         key: string,
         config: LocatorConfig
@@ -99,6 +94,7 @@ export class SelfHealingLocator {
         );
     }
 
+    // Write healing activity to the audit log.
     private log(message: string): void {
         fs.mkdirSync(path.dirname(this.auditPath), {
             recursive: true
@@ -111,45 +107,62 @@ export class SelfHealingLocator {
         );
     }
 
+    // Convert locator configuration into a Playwright locator.
     private createLocator(config: LocatorConfig): Locator {
-        switch (config.type) {
-            case 'css':
-                return this.page.locator(config.value);
+    switch (config.type) {
+        case 'css':
+            return this.page.locator(config.value);
 
-            case 'xpath':
-                return this.page.locator(`xpath=${config.value}`);
+        case 'xpath':
+            return this.page.locator(`xpath=${config.value}`);
 
-            case 'placeholder':
-                return this.page.getByPlaceholder(config.value, {
-                    exact: true
-                });
+        case 'placeholder':
+            return this.page.getByPlaceholder(config.value, {
+                exact: true
+            });
 
-            case 'label':
-                return this.page.getByLabel(config.value, {
-                    exact: true
-                });
+        case 'label':
+            return this.page.getByLabel(config.value, {
+                exact: true
+            });
 
-            case 'text':
-                return this.page.getByText(config.value, {
-                    exact: true
-                });
+        case 'text':
+            return this.page.getByText(config.value, {
+                exact: true
+            });
 
-            case 'testId':
-                return this.page.getByTestId(config.value);
+        case 'testId':
+            return this.page.getByTestId(config.value);
 
-            case 'role':
-                return this.page.getByRole(config.role, {
+        case 'altText':
+            return this.page.getByAltText(config.value, {
+                exact: true
+            });
+
+        case 'role':
+            return this.page.getByRole(
+                config.role as Parameters<Page['getByRole']>[0],
+                {
                     name: config.name,
                     exact: true
-                });
-        }
-    }
+                }
+            );
 
+        default:
+            throw new Error(
+                `Unsupported locator configuration: ${JSON.stringify(config)}`
+            );
+    }
+}
+
+    // Check whether a locator identifies exactly one visible element.
     private async isUniqueAndVisible(
         locator: Locator
     ): Promise<boolean> {
         try {
-            if (await locator.count() !== 1) {
+            const count = await locator.count();
+
+            if (count !== 1) {
                 return false;
             }
 
@@ -159,17 +172,13 @@ export class SelfHealingLocator {
         }
     }
 
-    /**
-     * Builds possible locator alternatives from the current DOM.
-     * Only candidates matching the intended element's semantic hints
-     * are considered. Ambiguous candidates are rejected.
-     */
+    // Discover possible alternatives using semantic DOM information.
     private async discoverCandidates(
         key: string
     ): Promise<LocatorConfig[]> {
         const candidates = await this.page
             .locator(
-                'input, button, textarea, select, [role="button"], [data-testid]'
+                'input, button, textarea, select, a, [role], [data-testid]'
             )
             .evaluateAll((elements, locatorKey) => {
                 const normalizedKey = String(locatorKey)
@@ -180,19 +189,40 @@ export class SelfHealingLocator {
                     .split(/[^a-z0-9]+/)
                     .filter(word => word.length > 1);
 
-                return elements.map((element) => {
+                return elements.map(element => {
                     const el = element as HTMLElement;
                     const tag = el.tagName.toLowerCase();
+
                     const input = el as HTMLInputElement;
 
+                    const name =
+                        el.getAttribute('name') ?? '';
+
+                    const placeholder =
+                        el.getAttribute('placeholder') ?? '';
+
+                    const ariaLabel =
+                        el.getAttribute('aria-label') ?? '';
+
+                    const title =
+                        el.getAttribute('title') ?? '';
+
+                    const testId =
+                        el.getAttribute('data-testid') ?? '';
+
+                    const text =
+                        (el.innerText ?? '').trim();
+
+                    const id = el.id ?? '';
+
                     const attributes = [
-                        el.id,
-                        el.getAttribute('name') ?? '',
-                        el.getAttribute('placeholder') ?? '',
-                        el.getAttribute('aria-label') ?? '',
-                        el.getAttribute('title') ?? '',
-                        el.dataset.testid ?? '',
-                        el.innerText ?? ''
+                        id,
+                        name,
+                        placeholder,
+                        ariaLabel,
+                        title,
+                        testId,
+                        text
                     ].join(' ').toLowerCase();
 
                     let score = 0;
@@ -203,24 +233,31 @@ export class SelfHealingLocator {
                         }
                     }
 
-                    // Semantic checks for common form elements.
+                    // Email fields must have email-related evidence.
                     if (
                         normalizedKey.includes('email') &&
                         (
                             input.type === 'email' ||
-                            input.name.toLowerCase().includes('email')
+                            name.toLowerCase().includes('email') ||
+                            placeholder.toLowerCase().includes('email')
                         )
                     ) {
                         score += 4;
                     }
 
+                    // Password fields must have password-related evidence.
                     if (
                         normalizedKey.includes('password') &&
-                        input.type === 'password'
+                        (
+                            input.type === 'password' ||
+                            name.toLowerCase().includes('password') ||
+                            placeholder.toLowerCase().includes('password')
+                        )
                     ) {
                         score += 4;
                     }
 
+                    // Login-related candidates must be actionable buttons.
                     if (
                         normalizedKey.includes('login') &&
                         tag === 'button'
@@ -230,16 +267,14 @@ export class SelfHealingLocator {
 
                     return {
                         tag,
-                        id: el.id,
-                        name: el.getAttribute('name') ?? '',
+                        id,
+                        name,
                         type: input.type ?? '',
-                        placeholder:
-                            el.getAttribute('placeholder') ?? '',
-                        ariaLabel:
-                            el.getAttribute('aria-label') ?? '',
-                        title: el.getAttribute('title') ?? '',
-                        text: (el.innerText ?? '').trim(),
-                        testId: el.dataset.testid ?? '',
+                        placeholder,
+                        ariaLabel,
+                        title,
+                        text,
+                        testId,
                         score
                     };
                 });
@@ -253,7 +288,7 @@ export class SelfHealingLocator {
             return [];
         }
 
-        // Do not guess if the best candidates are equally likely.
+        // Reject equally ranked candidates rather than guessing.
         if (
             ranked.length > 1 &&
             ranked[0].score === ranked[1].score
@@ -267,6 +302,7 @@ export class SelfHealingLocator {
         }
 
         const best = ranked[0];
+
         let config: LocatorConfig | undefined;
 
         if (best.testId) {
@@ -275,13 +311,15 @@ export class SelfHealingLocator {
                 value: best.testId
             };
         } else if (best.id) {
-            // Use an attribute selector to avoid CSS.escape dependencies.
             config = {
                 type: 'css',
                 value: `[id=${JSON.stringify(best.id)}]`
             };
-        } else if (best.name) {
-            // JSON.stringify safely quotes and escapes the attribute value.
+        } else if (best.name && (
+            best.tag === 'input' ||
+            best.tag === 'textarea' ||
+            best.tag === 'select'
+        )) {
             config = {
                 type: 'css',
                 value: `${best.tag}[name=${JSON.stringify(best.name)}]`
@@ -314,6 +352,7 @@ export class SelfHealingLocator {
         return config ? [config] : [];
     }
 
+    // Main locator resolution method.
     async find(
         key: string,
         primary: LocatorConfig,
@@ -322,7 +361,7 @@ export class SelfHealingLocator {
         const cache = this.readCache();
         const cached = cache[key];
 
-        // 1. Try the previously healed locator.
+        // 1. Try the cached locator.
         if (cached) {
             const cachedLocator = this.createLocator(cached);
 
@@ -348,7 +387,7 @@ export class SelfHealingLocator {
 
         this.log(`ORIGINAL_FAILED | ${key}`);
 
-        // 3. Try configured alternatives.
+        // 3. Try explicitly configured fallbacks.
         for (const fallback of fallbacks) {
             const locator = this.createLocator(fallback);
 
@@ -364,7 +403,7 @@ export class SelfHealingLocator {
             }
         }
 
-        // 4. Discover possible alternatives from the current DOM.
+        // 4. Try DOM-based discovery.
         const discovered = await this.discoverCandidates(key);
 
         for (const candidate of discovered) {
@@ -382,6 +421,7 @@ export class SelfHealingLocator {
             }
         }
 
+        // 5. No safe locator found.
         this.log(`HEALING_FAILED | ${key}`);
 
         throw new Error(

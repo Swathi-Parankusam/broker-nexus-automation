@@ -1,11 +1,12 @@
 {
   "name": "broker-nexus-automation",
   "version": "1.0.0",
-  "description": "Broker Nexus login automation using Playwright, TypeScript, and Cucumber BDD",
+  "description": "Broker Nexus automation using Playwright, TypeScript, and Cucumber BDD",
   "main": "index.js",
   "scripts": {
-    "test:bdd": "cucumber-js --import tsx --import ./support/world.ts --import ./support/hooks.ts --import ./step-definitions/login.steps.ts ./features/login.feature --format progress --format html:reports/cucumber-report.html"
+    "test:bdd": "node --import tsx ./node_modules/@cucumber/cucumber/bin/cucumber.js --import ./support/world.ts --import ./support/hooks.ts --import ./step-definitions/underwriters.steps.ts --format progress --format html:reports/cucumber-report.html"
   },
+
   "keywords": [
     "playwright",
     "typescript",

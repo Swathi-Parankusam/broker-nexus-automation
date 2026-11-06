@@ -1,33 +1,46 @@
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
+
+import { SelfHealingActions } from '../utils/SelfHealingActions.js';
+import type { LocatorConfig } from '../utils/LocatorConfig.js';
 
 export class LoginPage {
     readonly page: Page;
+    readonly actions: SelfHealingActions;
 
-    readonly emailInput: Locator;
-    readonly passwordInput: Locator;
-    readonly passwordVisibilityIcon: Locator;
-    readonly loginButton: Locator;
+    // =====================================================
+    // CENTRALIZED LOCATOR CONFIGURATIONS
+    // =====================================================
+
+    private readonly emailLocator: LocatorConfig = {
+        type: 'role',
+        role: 'textbox',
+        name: 'Email Address *'
+    };
+
+    private readonly passwordLocator: LocatorConfig = {
+        type: 'role',
+        role: 'textbox',
+        name: 'Password *'
+    };
+
+    private readonly passwordVisibilityLocator: LocatorConfig = {
+        type: 'altText',
+        value: 'Toggle Password Visibility'
+    };
+
+    private readonly loginButtonLocator: LocatorConfig = {
+        type: 'role',
+        role: 'button',
+        name: 'Login Icon Login'
+    };
+
+    // =====================================================
+    // CONSTRUCTOR
+    // =====================================================
 
     constructor(page: Page) {
         this.page = page;
-
-        // Login page locators
-        this.emailInput = page.getByRole('textbox', {
-            name: 'Email Address *'
-        });
-
-        this.passwordInput = page.getByRole('textbox', {
-            name: 'Password *'
-        });
-
-        // Password visibility toggle is an image with this alt text
-        this.passwordVisibilityIcon = page.getByAltText(
-            'Toggle Password Visibility'
-        );
-
-        this.loginButton = page.getByRole('button', {
-            name: 'Login Icon Login'
-        });
+        this.actions = new SelfHealingActions(page);
     }
 
     // =====================================================
@@ -55,25 +68,37 @@ export class LoginPage {
         console.log('Current URL:', this.page.url());
         console.log('Page title:', await this.page.title());
 
-        // Diagnostic information for login locators
-        console.log(
-            'Email locator count:',
-            await this.emailInput.count()
+        const email = await this.actions.getLocator(
+            'emailInput',
+            this.emailLocator
         );
 
-        console.log(
-            'Password locator count:',
-            await this.passwordInput.count()
+        const password = await this.actions.getLocator(
+            'passwordInput',
+            this.passwordLocator
         );
+
+        const visibilityIcon = await this.actions.getLocator(
+            'passwordVisibilityIcon',
+            this.passwordVisibilityLocator
+        );
+
+        const loginButton = await this.actions.getLocator(
+            'loginButton',
+            this.loginButtonLocator
+        );
+
+        console.log('Email locator count:', await email.count());
+        console.log('Password locator count:', await password.count());
 
         console.log(
             'Password visibility icon count:',
-            await this.passwordVisibilityIcon.count()
+            await visibilityIcon.count()
         );
 
         console.log(
             'Login button locator count:',
-            await this.loginButton.count()
+            await loginButton.count()
         );
 
         const inputDetails = await this.page
@@ -97,20 +122,24 @@ export class LoginPage {
     // =====================================================
 
     async verifyLoginFormVisible(): Promise<void> {
-        await this.emailInput.waitFor({
-            state: 'visible',
-            timeout: 15000
-        });
+        const email = await this.actions.getLocator(
+            'emailInput',
+            this.emailLocator
+        );
 
-        await this.passwordInput.waitFor({
-            state: 'visible',
-            timeout: 10000
-        });
+        const password = await this.actions.getLocator(
+            'passwordInput',
+            this.passwordLocator
+        );
 
-        await this.loginButton.waitFor({
-            state: 'visible',
-            timeout: 10000
-        });
+        const loginButton = await this.actions.getLocator(
+            'loginButton',
+            this.loginButtonLocator
+        );
+
+        await expect(email).toBeVisible({ timeout: 15000 });
+        await expect(password).toBeVisible({ timeout: 10000 });
+        await expect(loginButton).toBeVisible({ timeout: 10000 });
 
         console.log('Login form is visible.');
     }
@@ -120,33 +149,38 @@ export class LoginPage {
     // =====================================================
 
     async enterEmail(email: string): Promise<void> {
-        await this.emailInput.waitFor({
-            state: 'visible',
-            timeout: 10000
-        });
+        await this.actions.fill(
+            'emailInput',
+            this.emailLocator,
+            email
+        );
 
-        await this.emailInput.fill(email);
+        console.log('Email address entered.');
     }
 
     async verifyEmailFieldVisible(): Promise<void> {
-        await this.emailInput.waitFor({
-            state: 'visible',
-            timeout: 10000
-        });
+        const email = await this.actions.getLocator(
+            'emailInput',
+            this.emailLocator
+        );
+
+        await expect(email).toBeVisible({ timeout: 10000 });
 
         console.log('Email field is visible.');
     }
 
     async verifyEmailPlaceholder(): Promise<void> {
-        await this.emailInput.waitFor({
-            state: 'visible',
-            timeout: 10000
-        });
+        const email = await this.actions.getLocator(
+            'emailInput',
+            this.emailLocator
+        );
 
-        const placeholder =
-            await this.emailInput.getAttribute('placeholder');
+        await expect(email).toHaveAttribute(
+            'placeholder',
+            'Enter your email ID'
+        );
 
-        console.log('Email placeholder:', placeholder);
+        console.log('Email Address placeholder verified.');
     }
 
     // =====================================================
@@ -154,149 +188,106 @@ export class LoginPage {
     // =====================================================
 
     async enterPassword(password: string): Promise<void> {
-        await this.passwordInput.waitFor({
-            state: 'visible',
-            timeout: 10000
-        });
-
-        await this.passwordInput.fill(password);
+        await this.actions.fill(
+            'passwordInput',
+            this.passwordLocator,
+            password
+        );
 
         console.log('Password entered.');
     }
 
     async verifyPasswordFieldVisible(): Promise<void> {
-        await this.passwordInput.waitFor({
-            state: 'visible',
-            timeout: 10000
-        });
+        const password = await this.actions.getLocator(
+            'passwordInput',
+            this.passwordLocator
+        );
+
+        await expect(password).toBeVisible({ timeout: 10000 });
 
         console.log('Password field is visible.');
     }
 
     async verifyPasswordMasked(): Promise<void> {
-        await this.passwordInput.waitFor({
-            state: 'visible',
-            timeout: 10000
-        });
+        const password = await this.actions.getLocator(
+            'passwordInput',
+            this.passwordLocator
+        );
 
-        const inputType =
-            await this.passwordInput.getAttribute('type');
-
-        if (inputType !== 'password') {
-            throw new Error(
-                `Expected password field type to be "password", ` +
-                `but received "${inputType}".`
-            );
-        }
+        await expect(password).toHaveAttribute(
+            'type',
+            'password'
+        );
 
         console.log('Password field is masked.');
+    }
+
+    async verifyPasswordVisibleAsText(): Promise<void> {
+        const password = await this.actions.getLocator(
+            'passwordInput',
+            this.passwordLocator
+        );
+
+        await expect(password).toHaveAttribute(
+            'type',
+            'text',
+            { timeout: 5000 }
+        );
+
+        console.log('Password is displayed as plain text.');
     }
 
     // =====================================================
     // PASSWORD VISIBILITY ICON
     // =====================================================
 
-    /**
-     * Verifies that the password visibility image exists
-     * and is visible.
-     */
     async verifyPasswordVisibilityIcon(): Promise<void> {
-        const count = await this.passwordVisibilityIcon.count();
-
-        console.log(
-            'Password visibility icon count:',
-            count
+        const icon = await this.actions.getLocator(
+            'passwordVisibilityIcon',
+            this.passwordVisibilityLocator
         );
 
-        if (count === 0) {
-            throw new Error(
-                'Password visibility icon was not found. ' +
-                'Expected an image with alt text ' +
-                '"Toggle Password Visibility".'
-            );
-        }
-
-        await this.passwordVisibilityIcon.waitFor({
-            state: 'visible',
-            timeout: 10000
-        });
-
-        await expect(
-            this.passwordVisibilityIcon
-        ).toBeVisible();
+        await expect(icon).toBeVisible({ timeout: 10000 });
 
         console.log('Password visibility icon is visible.');
     }
 
-    /**
-     * Clicks the password visibility image.
-     *
-     * Playwright locates the image by its accessible alt text.
-     */
     async clickPasswordVisibilityIcon(): Promise<void> {
-        await this.passwordVisibilityIcon.waitFor({
-            state: 'visible',
-            timeout: 10000
-        });
-
-        await this.passwordVisibilityIcon.click();
+        await this.actions.click(
+            'passwordVisibilityIcon',
+            this.passwordVisibilityLocator
+        );
 
         console.log('Password visibility icon clicked.');
     }
 
-    /**
-     * Verifies that clicking the visibility toggle
-     * displays the password as plain text.
-     */
-    async verifyPasswordVisibleAsText(): Promise<void> {
-        await this.passwordInput.waitFor({
-            state: 'visible',
-            timeout: 10000
-        });
+    // =====================================================
+    // PASSWORD VISIBILITY DEBUG
+    // =====================================================
 
-        await expect(this.passwordInput).toHaveAttribute(
-            'type',
-            'text',
-            {
-                timeout: 5000
-            }
-        );
-
-        console.log(
-            'Password is displayed as plain text.'
-        );
-    }
-
-    /**
-     * Optional diagnostic method.
-     *
-     * Prints the password input HTML, surrounding elements,
-     * buttons, and password visibility images.
-     */
     async inspectPasswordVisibilityIcon(): Promise<void> {
-        console.log(
-            '\n========== PASSWORD FIELD DEBUG =========='
+        const password = await this.actions.getLocator(
+            'passwordInput',
+            this.passwordLocator
         );
+
+        console.log('\n========== PASSWORD FIELD DEBUG ==========');
 
         console.log(
             'Password input HTML:',
-            await this.passwordInput.evaluate(
-                element => element.outerHTML
-            )
+            await password.evaluate(element => element.outerHTML)
         );
 
         console.log(
             'Password parent HTML:',
-            await this.passwordInput.evaluate(
-                element =>
-                    element.parentElement?.outerHTML ??
-                    'No parent'
+            await password.evaluate(
+                element => element.parentElement?.outerHTML ?? 'No parent'
             )
         );
 
         console.log(
             'Password grandparent HTML:',
-            await this.passwordInput.evaluate(
+            await password.evaluate(
                 element =>
                     element.parentElement?.parentElement?.outerHTML ??
                     'No grandparent'
@@ -359,9 +350,7 @@ export class LoginPage {
             JSON.stringify(possibleControls, null, 2)
         );
 
-        console.log(
-            '========== END PASSWORD FIELD DEBUG ==========\n'
-        );
+        console.log('========== END PASSWORD FIELD DEBUG ==========\n');
     }
 
     // =====================================================
@@ -369,21 +358,21 @@ export class LoginPage {
     // =====================================================
 
     async clickLogin(): Promise<void> {
-        await this.loginButton.waitFor({
-            state: 'visible',
-            timeout: 10000
-        });
-
-        await this.loginButton.click();
+        await this.actions.click(
+            'loginButton',
+            this.loginButtonLocator
+        );
 
         console.log('Login button clicked.');
     }
 
     async verifyLoginButtonVisible(): Promise<void> {
-        await this.loginButton.waitFor({
-            state: 'visible',
-            timeout: 10000
-        });
+        const loginButton = await this.actions.getLocator(
+            'loginButton',
+            this.loginButtonLocator
+        );
+
+        await expect(loginButton).toBeVisible({ timeout: 10000 });
 
         console.log('Login button is visible.');
     }
@@ -425,9 +414,7 @@ export class LoginPage {
                     !currentPath.endsWith('/login')
                 );
             },
-            {
-                timeout: 15000
-            }
+            { timeout: 15000 }
         );
 
         console.log('Successful-login navigation detected.');
@@ -452,63 +439,49 @@ export class LoginPage {
     async clickProfileIcon(): Promise<void> {
         console.log('Looking for the profile icon...');
 
-        const profileLocators: Locator[] = [
-            this.page.getByRole('button', {
-                name: /profile|account|user menu/i
-            }),
-
-            this.page.getByRole('button', {
-                name: /^A$/
-            }),
-
-            this.page.locator('[aria-label*="profile" i]'),
-
-            this.page.locator('[aria-label*="account" i]'),
-
-            this.page.locator('[title*="profile" i]'),
-
-            this.page.locator('[aria-haspopup="menu"]')
-        ];
-
-        for (const locator of profileLocators) {
-            const count = await locator.count();
-
-            for (let index = 0; index < count; index++) {
-                const element = locator.nth(index);
-
-                if (await element.isVisible()) {
-                    await element.click();
-
-                    console.log('Profile control clicked.');
-
-                    return;
+        await this.actions.click(
+            'profileIcon',
+            {
+                type: 'role',
+                role: 'button',
+                name: 'Profile'
+            },
+            [
+                {
+                    type: 'role',
+                    role: 'button',
+                    name: 'Account'
+                },
+                {
+                    type: 'role',
+                    role: 'button',
+                    name: 'User menu'
+                },
+                {
+                    type: 'role',
+                    role: 'button',
+                    name: 'A'
+                },
+                {
+                    type: 'css',
+                    value: '[aria-label*="profile" i]'
+                },
+                {
+                    type: 'css',
+                    value: '[aria-label*="account" i]'
+                },
+                {
+                    type: 'css',
+                    value: '[title*="profile" i]'
+                },
+                {
+                    type: 'css',
+                    value: '[aria-haspopup="menu"]'
                 }
-            }
-        }
-
-        const buttons = await this.page
-            .locator('button')
-            .evaluateAll(elements =>
-                elements.map((element, index) => ({
-                    index,
-                    text: element.textContent?.trim(),
-                    ariaLabel: element.getAttribute('aria-label'),
-                    title: element.getAttribute('title'),
-                    role: element.getAttribute('role'),
-                    html: element.outerHTML.slice(0, 250)
-                }))
-            );
-
-        console.log(
-            'Dashboard buttons for profile locator investigation:',
-            buttons
+            ]
         );
 
-        throw new Error(
-            'Could not find a visible profile icon. ' +
-            'Review the dashboard button details in the terminal. ' +
-            `Current URL: ${this.page.url()}`
-        );
+        console.log('Profile control clicked.');
     }
 
     // =====================================================
@@ -518,103 +491,43 @@ export class LoginPage {
     async clickLogoutOption(): Promise<void> {
         console.log('Looking for the logout option...');
 
-        const logoutLocators: Locator[] = [
-            this.page.getByRole('menuitem', {
-                name: /sign out|log out|logout/i
-            }),
-
-            this.page.getByRole('button', {
-                name: /sign out|log out|logout/i
-            }),
-
-            this.page.getByText(
-                /^(sign out|log out|logout)$/i
-            )
-        ];
-
-        for (const locator of logoutLocators) {
-            const count = await locator.count();
-
-            for (let index = 0; index < count; index++) {
-                const element = locator.nth(index);
-
-                if (await element.isVisible()) {
-                    await element.click();
-
-                    console.log('Logout option clicked.');
-
-                    return;
-                }
-            }
-        }
-
-        const menuElements = await this.page
-            .locator(
-                '[role="menu"], [role="menuitem"], ' +
-                '[aria-haspopup], [aria-label*="logout" i], ' +
-                '[aria-label*="sign out" i]'
-            )
-            .evaluateAll(elements =>
-                elements.map((element, index) => ({
-                    index,
-                    tag: element.tagName,
-                    text: element.textContent?.trim(),
-                    role: element.getAttribute('role'),
-                    ariaLabel: element.getAttribute('aria-label'),
-                    ariaHasPopup: element.getAttribute('aria-haspopup'),
-                    title: element.getAttribute('title'),
-                    html: element.outerHTML.slice(0, 250)
-                }))
-            );
-
-        console.log('Dashboard menu elements:', menuElements);
-
-        throw new Error(
-            'Could not find a visible logout option after clicking ' +
-            'the profile icon. Review the menu element details in the terminal.'
-        );
-    }
-
-    // =====================================================
-    // VERIFY REDIRECTION TO LOGIN PAGE
-    // =====================================================
-
-    /*
-    async verifyLoginPageRedirection(): Promise<void> {
-        const configuredUrl = process.env.BROKER_NEXUS_URL;
-
-        if (!configuredUrl) {
-            throw new Error(
-                'BROKER_NEXUS_URL is missing from the .env file.'
-            );
-        }
-
-        const baseUrl = new URL(configuredUrl);
-
-        const normalizePath = (pathname: string): string => {
-            while (pathname.endsWith('/')) {
-                pathname = pathname.slice(0, -1);
-            }
-
-            return pathname || '/';
-        };
-
-        const expectedPath = normalizePath(baseUrl.pathname);
-
-        await this.page.waitForURL(
-            url =>
-                url.origin === baseUrl.origin &&
-                normalizePath(url.pathname) === expectedPath,
+        await this.actions.click(
+            'logoutOption',
             {
-                timeout: 15000
-            }
+                type: 'role',
+                role: 'menuitem',
+                name: 'Sign out'
+            },
+            [
+                {
+                    type: 'role',
+                    role: 'menuitem',
+                    name: 'Log out'
+                },
+                {
+                    type: 'role',
+                    role: 'menuitem',
+                    name: 'Logout'
+                },
+                {
+                    type: 'role',
+                    role: 'button',
+                    name: 'Sign out'
+                },
+                {
+                    type: 'role',
+                    role: 'button',
+                    name: 'Logout'
+                },
+                {
+                    type: 'text',
+                    value: 'Logout'
+                }
+            ]
         );
 
-        await this.verifyLoginFormVisible();
-
-        console.log('Redirected to the login page.');
+        console.log('Logout option clicked.');
     }
-    */
 
     // =====================================================
     // VERIFY LOGGED-OUT STATE
@@ -633,11 +546,15 @@ export class LoginPage {
     async verifyLoginRejected(): Promise<void> {
         await this.page.waitForTimeout(1500);
 
-        const emailVisible =
-            await this.emailInput.isVisible().catch(() => false);
+        const emailVisible = await this.actions.isVisible(
+            'emailInput',
+            this.emailLocator
+        );
 
-        const passwordVisible =
-            await this.passwordInput.isVisible().catch(() => false);
+        const passwordVisible = await this.actions.isVisible(
+            'passwordInput',
+            this.passwordLocator
+        );
 
         const configuredUrl = process.env.BROKER_NEXUS_URL;
 

@@ -9,13 +9,14 @@ import type {
   Page,
 } from '@playwright/test';
 
-import type { LoginPage } from '../pages/LoginPage.ts';
+import type { UnderwritersPage } from '../pages/UnderwritersPage.ts';
 
 export class CustomWorld extends World {
   browser?: Browser;
   context?: BrowserContext;
   page?: Page;
-  loginPage?: LoginPage;
+  underwritersPage?: UnderwritersPage;
+  websitePage?: Page;
 }
 
 setWorldConstructor(CustomWorld);

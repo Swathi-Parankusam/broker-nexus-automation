@@ -107,19 +107,12 @@ function normalizeUrl(url: string): string {
 async function isLoginFormVisible(
     loginPage: LoginPage
 ): Promise<boolean> {
-    const emailVisible = await loginPage.emailInput
-        .isVisible()
-        .catch(() => false);
-
-    const passwordVisible = await loginPage.passwordInput
-        .isVisible()
-        .catch(() => false);
-
-    const buttonVisible = await loginPage.loginButton
-        .isVisible()
-        .catch(() => false);
-
-    return emailVisible && passwordVisible && buttonVisible;
+    try {
+        await loginPage.verifyLoginFormVisible();
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 // =====================================================
@@ -135,8 +128,7 @@ Given(
 
         await loginPage.navigate();
 
-        await expect(loginPage.emailInput).toBeVisible();
-        await expect(loginPage.passwordInput).toBeVisible();
+        await loginPage.verifyLoginFormVisible();
 
         await demoPause(this, 2000);
 
@@ -153,7 +145,7 @@ Then(
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
 
-        await expect(loginPage.emailInput).toBeVisible();
+        await loginPage.verifyEmailFieldVisible();
 
         await demoPause(this, 1500);
 
@@ -170,10 +162,7 @@ Then(
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
 
-        await expect(loginPage.emailInput).toHaveAttribute(
-            'placeholder',
-            'Enter your email ID'
-        );
+        await loginPage.verifyEmailPlaceholder();
 
         await demoPause(this, 1500);
 
@@ -190,7 +179,7 @@ Then(
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
 
-        await expect(loginPage.passwordInput).toBeVisible();
+        await loginPage.verifyPasswordFieldVisible();
 
         await demoPause(this, 1500);
 
@@ -207,10 +196,7 @@ Then(
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
 
-        await expect(loginPage.passwordInput).toHaveAttribute(
-            'type',
-            'password'
-        );
+        await loginPage.verifyPasswordMasked();
 
         await demoPause(this, 1500);
 
@@ -226,7 +212,12 @@ Then(
     'the password visibility icon should be visible',
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
-        await loginPage.inspectPasswordVisibilityIcon();
+
+        await loginPage.verifyPasswordVisibilityIcon();
+
+        await demoPause(this, 1500);
+
+        console.log('Password visibility icon is visible.');
     }
 );
 
@@ -276,10 +267,7 @@ Then(
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
 
-        await expect(loginPage.passwordInput).toHaveAttribute(
-            'type',
-            'text'
-        );
+        await loginPage.verifyPasswordVisibleAsText();
 
         await demoPause(this, 1500);
 
@@ -372,9 +360,15 @@ Then(
             async () => {
                 const currentUrl = normalizeUrl(page.url());
 
-                const loginButtonVisible = await loginPage.loginButton
-                    .isVisible()
-                    .catch(() => false);
+                const loginButtonVisible =
+                    await loginPage.actions.isVisible(
+                        'loginButton',
+                        {
+                            type: 'role',
+                            role: 'button',
+                            name: 'Login Icon Login'
+                        }
+                    );
 
                 return (
                     currentUrl !== baseUrl ||
@@ -467,7 +461,8 @@ Then(
 
         await demoPause(this, 1500);
 
-        const loginFormVisible = await isLoginFormVisible(loginPage);
+        const loginFormVisible =
+            await isLoginFormVisible(loginPage);
 
         const currentUrl = normalizeUrl(page.url());
 
@@ -501,9 +496,35 @@ Then(
 When(
     'I click the Logout button',
     async function (this: CustomWorld) {
+        const loginPage = getLoginPage(this);
+
         console.log('Clicking the Logout button...');
 
-        await getPage(this).getByRole('button', { name: /logout/i }).click();
+        await loginPage.actions.click(
+            'logoutButton',
+            {
+                type: 'role',
+                role: 'button',
+                name: 'Logout'
+            },
+            [
+                {
+                    type: 'role',
+                    role: 'button',
+                    name: 'Log out'
+                },
+                {
+                    type: 'role',
+                    role: 'menuitem',
+                    name: 'Logout'
+                },
+                {
+                    type: 'role',
+                    role: 'menuitem',
+                    name: 'Log out'
+                }
+            ]
+        );
 
         await demoPause(this, 2000);
 
@@ -522,9 +543,7 @@ Then(
 
         console.log('Verifying successful logout...');
 
-        await expect(loginPage.emailInput).toBeVisible();
-        await expect(loginPage.passwordInput).toBeVisible();
-        await expect(loginPage.loginButton).toBeVisible();
+        await loginPage.verifyLoggedOut();
 
         await demoPause(this, 2000);
 
@@ -574,24 +593,22 @@ When(
 // 21. VERIFY REDIRECTION TO LOGIN PAGE
 // =====================================================
 
-/* Then(
+/*
+Then(
     'I should be redirected to the login page',
     async function (this: CustomWorld) {
         const loginPage = getLoginPage(this);
 
         console.log('Verifying redirection to the login page...');
 
-        await loginPage.verifyLoginPageRedirection();
-
-        await expect(loginPage.emailInput).toBeVisible();
-        await expect(loginPage.passwordInput).toBeVisible();
-        await expect(loginPage.loginButton).toBeVisible();
+        await loginPage.verifyLoginFormVisible();
 
         await demoPause(this, 2000);
 
         console.log('Redirected to the login page successfully.');
     }
-); */   
+);
+*/
 
 // =====================================================
 // 22. DEBUG: INSPECT PASSWORD VISIBILITY ELEMENTS
@@ -604,9 +621,9 @@ When(
 
         const passwordFields = await getPage(this)
             .locator('input[type="password"]')
-            .evaluateAll((inputs) =>
+            .evaluateAll(inputs =>
                 inputs.map(
-                    (input) =>
+                    input =>
                         input.parentElement?.outerHTML ??
                         input.outerHTML
                 )
